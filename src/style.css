@@ -8,3 +8,6 @@
 .typing.upgraded .typingEntry.visuallyHiddenEntry {position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;margin:0!important;border:0!important;opacity:0!important;overflow:hidden!important;resize:none!important;left:14px;top:150px;pointer-events:none}
 .typing.upgraded .readingWindow {cursor:text}
 .typing.upgraded .readingWindow:focus-visible {outline:2px solid #5ddbb4;outline-offset:3px}
+
+/* Keep each typed line in view without animated multi-line jumps. */
+.typing.upgraded .readingWindow {scroll-behavior:auto}
