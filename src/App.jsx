@@ -19,7 +19,22 @@ function TypingBox({text,onComplete,enabled=true,resetKey=0,showTimer=true,pract
  const s=stats(text,typed,Math.max(1,elapsed));
  const finish=useCallback((value,ms)=>{if(finished.current)return;finished.current=true;const result={typed:value,elapsedMs:Math.max(1,ms),...stats(text,value,Math.max(1,ms))};setDone(result);onComplete?.(result);},[text,onComplete]);
  useEffect(()=>{if(!started||finished.current||!enabled)return;const t=setInterval(()=>{const stamp=Date.now();setNow(stamp);if(practice&&stamp-started>=duration*1000)finish(typed,duration*1000)},120);return()=>clearInterval(t)},[started,typed,enabled,practice,duration,finish]);
- useEffect(()=>{if(cursor.current&&passage.current){const c=cursor.current,p=passage.current;if(c.offsetTop>p.scrollTop+p.clientHeight-65||c.offsetTop<p.scrollTop)p.scrollTop=Math.max(0,c.offsetTop-65)}},[typed]);
+ useEffect(()=>{
+  const c=cursor.current,p=passage.current;
+  if(!c||!p)return;
+  // Scroll only when the active line reaches the bottom of the viewport.
+  // offsetTop is relative to a positioned ancestor and can cause large jumps.
+  const cursorBox=c.getBoundingClientRect();
+  const panelBox=p.getBoundingClientRect();
+  const lineHeight=parseFloat(getComputedStyle(p).lineHeight)||40;
+  const bottomLimit=panelBox.bottom-Math.min(lineHeight,48);
+  const topLimit=panelBox.top+Math.min(lineHeight,48);
+  if(cursorBox.bottom>bottomLimit){
+    p.scrollTop+=cursorBox.bottom-bottomLimit;
+  }else if(cursorBox.top<topLimit){
+    p.scrollTop-=topLimit-cursorBox.top;
+  }
+},[typed]);
  function change(e){if(!enabled||finished.current)return;const value=e.target.value.slice(0,text.length);const stamp=Date.now(),start=started||stamp;if(!started)setStarted(start);setNow(stamp);if(value.length>typed.length&&!muted)keySound(value[value.length-1]===text[value.length-1]);setTyped(value);if(value.length===text.length)finish(value,stamp-start);}
  return <div className="typing upgraded" onClick={()=>ref.current?.focus()}>
  <div className="typeToolbar"><span className="typeTitle">⌨ Type the highlighted passage</span><div className="typeControls">{practice&&<label>Test length <select aria-label="Typing test duration" value={duration} onChange={e=>setDuration(Number(e.target.value))}><option value={60}>1 min</option><option value={180}>3 min</option></select></label>}<button type="button" className="outline soundToggle" onClick={e=>{e.stopPropagation();setMuted(m=>!m)}}>{muted?'🔇 Sound off':'🔊 Sound on'}</button></div></div>
