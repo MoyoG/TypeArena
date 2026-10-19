@@ -2,13 +2,31 @@ import React, {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {supabase} from './main.jsx';
 import {Trophy, Keyboard, Users, LogOut, Play, Copy, RefreshCw, ShieldCheck, GraduationCap, CircleHelp} from 'lucide-react';
 const LESSONS = [{"level": "Easy · Words only", "title": "Home and family", "text": "home family mother father sister brother garden morning evening together happy kind warm"}, {"level": "Easy · Words only", "title": "Nature", "text": "forest river mountain ocean flower tree cloud sunshine wind rain valley field"}, {"level": "Easy · Words only", "title": "School", "text": "student teacher classroom lesson book pencil paper reading writing learning question answer"}, {"level": "Easy · Words only", "title": "Daily routine", "text": "wake breakfast walk work lunch dinner relax sleep fresh early quiet comfortable"}, {"level": "Easy · Words only", "title": "Travel", "text": "journey station ticket hotel airport bicycle train village city explore discover adventure"}, {"level": "Intermediate · Words and numbers", "title": "Daily numbers", "text": "There are 12 students in room 5 and 24 books on shelf 3"}, {"level": "Intermediate · Words and numbers", "title": "Shopping", "text": "Buy 4 apples 6 oranges and 2 loaves for a family of 5"}, {"level": "Intermediate · Words and numbers", "title": "Schedules", "text": "The train leaves at 8 and arrives at 10 after 2 stops"}, {"level": "Intermediate · Words and numbers", "title": "Science facts", "text": "Water freezes at 0 degrees and boils at 100 degrees at sea level"}, {"level": "Intermediate · Words and numbers", "title": "Classroom results", "text": "Student 14 solved 18 questions in 25 minutes and earned 90 points"}, {"level": "Advanced · Punctuation and numbers", "title": "A short note", "text": "Hello, Alex! Please bring 3 notebooks, 2 pens, and your ID."}, {"level": "Advanced · Punctuation and numbers", "title": "A reminder", "text": "At 9:30, call the office; then, email 2 reports before 5:00."}, {"level": "Advanced · Punctuation and numbers", "title": "Weather report", "text": "Today, the temperature is 28 degrees; tomorrow, it may reach 31."}, {"level": "Advanced · Punctuation and numbers", "title": "The question", "text": "Why did 7 students arrive late? The bus, unfortunately, stopped twice."}, {"level": "Advanced · Punctuation and numbers", "title": "Instructions", "text": "Step 1: Open the file. Step 2: Read it carefully. Step 3: Save your work!"}, {"level": "Expert · Symbols and characters", "title": "Email addresses", "text": "Contact help@example.com or admin@school.edu; include ticket #204."}, {"level": "Expert · Symbols and characters", "title": "Prices and discounts", "text": "A $45.00 item with 20% off costs $36.00; add a 5% fee."}, {"level": "Expert · Symbols and characters", "title": "Keyboard symbols", "text": "Use @, #, $, %, &, *, +, =, /, \\, and _ when required."}, {"level": "Expert · Symbols and characters", "title": "Code and brackets", "text": "Set value = (12 + 8) * 3; check [value] != {0} && value >= 20."}, {"level": "Expert · Symbols and characters", "title": "Mixed challenge", "text": "User_27 paid $19.99 @ 8:45; status = \"OK\"! Ref: #A-302 & B/7."}];
-const longPassage = text => Array(18).fill(text).join(" ");
+const longPassage = text => text;
+const REAL_PASSAGES = {
+ 'Home and family': 'My family eats breakfast together every Saturday morning. We talk about our plans, water the garden, and enjoy a quiet start to the weekend.',
+ Nature: 'A cool wind moved through the trees while small birds crossed the bright morning sky. The river was calm, clear, and easy to follow.',
+ School: 'The teacher opened a new book and asked the class to read the first page. Everyone listened, wrote a few notes, and shared one question.',
+ 'Daily routine': 'I wake up early, make a warm breakfast, and walk to work. In the evening, I cook dinner, call a friend, and read before bed.',
+ Travel: 'Our train left the station just after sunrise. We watched the fields pass by, found a small hotel, and explored the old city on foot.'
+};
 const showError=e=>e?.message||'An unexpected error occurred';
 const seconds=(ms)=>Math.max(0,Math.floor(ms/1000));
 function stats(target,typed,elapsedMs){let good=0;for(let i=0;i<typed.length;i++)if(typed[i]===target[i])good++;return {accuracy:typed.length?Math.round(good/typed.length*100):100,wpm:elapsedMs>0?Math.round(good/5/(elapsedMs/60000)):0,good};}
 let typingAudio=null;
-function keySound(ok){
- try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;typingAudio=typingAudio||new C();if(typingAudio.state==='suspended')typingAudio.resume();const osc=typingAudio.createOscillator(),gain=typingAudio.createGain(),t=typingAudio.currentTime;osc.type=ok?'sine':'triangle';osc.frequency.setValueAtTime(ok?740:230,t);gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(ok?.045:.075,t+.008);gain.gain.exponentialRampToValueAtTime(.0001,t+(ok?.055:.14));osc.connect(gain).connect(typingAudio.destination);osc.start(t);osc.stop(t+(ok?.06:.15));}catch(e){}
+function keySound(ok,key='a'){
+ try{
+  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
+  typingAudio=typingAudio||new C();if(typingAudio.state==='suspended')typingAudio.resume();
+  const t=typingAudio.currentTime,variation=(key.charCodeAt(0)%9)*7;
+  const osc=typingAudio.createOscillator(),toneGain=typingAudio.createGain();
+  osc.type='square';osc.frequency.setValueAtTime((ok?155:105)+variation,t);
+  toneGain.gain.setValueAtTime(.0001,t);toneGain.gain.exponentialRampToValueAtTime(ok?.055:.08,t+.002);toneGain.gain.exponentialRampToValueAtTime(.0001,t+.075);
+  osc.connect(toneGain).connect(typingAudio.destination);osc.start(t);osc.stop(t+.08);
+  const buffer=typingAudio.createBuffer(1,Math.floor(typingAudio.sampleRate*.045),typingAudio.sampleRate),data=buffer.getChannelData(0);
+  for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,2);
+  const click=typingAudio.createBufferSource(),clickGain=typingAudio.createGain();click.buffer=buffer;clickGain.gain.value=ok?.12:.16;click.connect(clickGain).connect(typingAudio.destination);click.start(t);
+ }catch(e){}
 }
 function TypingBox({text,onComplete,enabled=true,resetKey=0,showTimer=true,practice=false}){
  const [typed,setTyped]=useState(''),[started,setStarted]=useState(null),[now,setNow]=useState(Date.now()),[muted,setMuted]=useState(false),[duration,setDuration]=useState(180),[done,setDone]=useState(null);
@@ -35,10 +53,10 @@ function TypingBox({text,onComplete,enabled=true,resetKey=0,showTimer=true,pract
     p.scrollTop-=topLimit-cursorBox.top;
   }
 },[typed]);
- function change(e){if(!enabled||finished.current)return;const value=e.target.value.slice(0,text.length);const stamp=Date.now(),start=started||stamp;if(!started)setStarted(start);setNow(stamp);if(value.length>typed.length&&!muted)keySound(value[value.length-1]===text[value.length-1]);setTyped(value);if(value.length===text.length)finish(value,stamp-start);}
+ function change(e){if(!enabled||finished.current)return;const value=e.target.value.slice(0,text.length);const stamp=Date.now(),start=started||stamp;if(!started)setStarted(start);setNow(stamp);if(value.length>typed.length&&!muted)keySound(value[value.length-1]===text[value.length-1],value[value.length-1]||'a');setTyped(value);if(value.length===text.length)finish(value,stamp-start);}
  return <div className="typing upgraded" onClick={()=>ref.current?.focus()}>
  <div className="typeToolbar"><span className="typeTitle">⌨ Type the highlighted passage</span><div className="typeControls">{practice&&<label>Test length <select aria-label="Typing test duration" value={duration} onChange={e=>setDuration(Number(e.target.value))}><option value={60}>1 min</option><option value={180}>3 min</option></select></label>}<button type="button" className="outline soundToggle" onClick={e=>{e.stopPropagation();setMuted(m=>!m)}}>{muted?'🔇 Sound off':'🔊 Sound on'}</button></div></div>
- <div className="typingMetrics"><span><b>{s.wpm}</b><small>WPM</small></span><span><b>{s.accuracy}%</b><small>Accuracy</small></span><span><b>{Math.round(typed.length/text.length*100)}%</b><small>Progress</small></span><span><b>{practice?`${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')}`:`${(elapsed/1000).toFixed(1)}s`}</b><small>{practice?'Time left':'Elapsed'}</small></span></div>
+ <div className="typingMetrics"><span><b>{done?done.wpm:'—'}</b><small>{done?'WPM':'WPM after test'}</small></span><span><b>{s.accuracy}%</b><small>Accuracy</small></span><span><b>{Math.round(typed.length/text.length*100)}%</b><small>Progress</small></span><span><b>{practice?`${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')}`:`${(elapsed/1000).toFixed(1)}s`}</b><small>{practice?'Time left':'Elapsed'}</small></span></div>
  <div ref={passage} className="readingWindow" aria-label="Text to type" role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();ref.current?.focus()}}}>{[...text].map((c,i)=><span key={i} ref={i===typed.length?cursor:null} className={'typingChar '+(i<typed.length?(typed[i]===c?'correct':'wrong'):i===typed.length?'cursor':'')}>{c===' '?'\u00a0':c}</span>)}</div>
  <textarea ref={ref} className="typingEntry visuallyHiddenEntry" aria-label="Type the passage here" autoCapitalize="off" autoComplete="off" autoCorrect="off" spellCheck="false" placeholder={enabled?'Click here, then type the text above…':'Wait for the race to start'} disabled={!enabled||finished.current} value={typed} onChange={change} onPaste={e=>e.preventDefault()} onDrop={e=>e.preventDefault()} onKeyDown={e=>{if((e.ctrlKey||e.metaKey)&&['v','x'].includes(e.key.toLowerCase()))e.preventDefault()}} rows="2"/>
  {done&&<div className="typingFinish" role="status"><strong>{done.accuracy>=95?'Excellent!':done.accuracy>=85?'Very good!':'Keep practicing!'}</strong> · {done.wpm} WPM · {done.accuracy}% accuracy</div>}
@@ -51,7 +69,7 @@ export default function App(){
  const [guestMode,setGuestMode]=useState(()=>localStorage.getItem('typearena_guest')==='yes');
  const [guestResults,setGuestResults]=useState(()=>{try{return JSON.parse(localStorage.getItem('typearena_guest_results')||'[]')}catch{return []}});
  const chosenLesson=lesson===20?{title:'Custom text',text:customText.trim()}:LESSONS[lesson];
- const practiceText=useMemo(()=>lesson===20?chosenLesson.text:longPassage(chosenLesson.text),[lesson,customText]);
+ const practiceText=useMemo(()=>lesson===20?chosenLesson.text:(REAL_PASSAGES[chosenLesson.title]||longPassage(chosenLesson.text)),[lesson,customText]);
  const [races,setRaces]=useState([]),[race,setRace]=useState(null),[participants,setParticipants]=useState([]),[results,setResults]=useState([]);
  const [newTitle,setNewTitle]=useState('Class typing challenge'),[newText,setNewText]=useState('The best way to learn to type is to practice a little every day.'),[joinCode,setJoinCode]=useState('');
  const [clock,setClock]=useState(Date.now()),[submitting,setSubmitting]=useState(false);
