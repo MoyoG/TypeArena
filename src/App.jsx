@@ -22,23 +22,9 @@ const expandPassage = (base,title) => {
 const showError=e=>e?.message||'An unexpected error occurred';
 const seconds=(ms)=>Math.max(0,Math.floor(ms/1000));
 function stats(target,typed,elapsedMs){let good=0;for(let i=0;i<typed.length;i++)if(typed[i]===target[i])good++;return {accuracy:typed.length?Math.round(good/typed.length*100):100,wpm:elapsedMs>0?Math.round(good/5/(elapsedMs/60000)):0,good};}
-let typingAudio=null,typingSamples=null;
-function makeKeySample(audio,ok){
- const length=Math.floor(audio.sampleRate*.045),buffer=audio.createBuffer(1,length,audio.sampleRate),data=buffer.getChannelData(0);
- for(let i=0;i<length;i++){
-  const time=i/audio.sampleRate,envelope=Math.exp(-time*105),thock=Math.sin(2*Math.PI*(ok?118:92)*time)*.55;
-  const softenedNoise=(Math.random()*2-1)*.18;
-  data[i]=(thock+softenedNoise)*envelope;
- }
- return buffer;
-}
+let typingAudio=null;
 function keySound(ok){
- try{
-  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
-  typingAudio=typingAudio||new C();if(typingAudio.state==='suspended')typingAudio.resume();
-  typingSamples=typingSamples||{ok:makeKeySample(typingAudio,true),wrong:makeKeySample(typingAudio,false)};
-  const source=typingAudio.createBufferSource(),gain=typingAudio.createGain();source.buffer=typingSamples[ok?'ok':'wrong'];gain.gain.value=ok?.075:.095;source.connect(gain).connect(typingAudio.destination);source.start();
- }catch(e){}
+ try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;typingAudio=typingAudio||new C();if(typingAudio.state==='suspended')typingAudio.resume();const osc=typingAudio.createOscillator(),gain=typingAudio.createGain(),t=typingAudio.currentTime;osc.type=ok?'sine':'triangle';osc.frequency.setValueAtTime(ok?740:230,t);gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(ok?.045:.075,t+.008);gain.gain.exponentialRampToValueAtTime(.0001,t+(ok?.055:.14));osc.connect(gain).connect(typingAudio.destination);osc.start(t);osc.stop(t+(ok?.06:.15));}catch(e){}
 }
 function TypingBox({text,onComplete,enabled=true,resetKey=0,showTimer=true,practice=false}){
  const [typed,setTyped]=useState(''),[started,setStarted]=useState(null),[now,setNow]=useState(Date.now()),[muted,setMuted]=useState(false),[duration,setDuration]=useState(180),[done,setDone]=useState(null);
