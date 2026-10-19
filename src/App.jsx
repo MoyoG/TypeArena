@@ -10,6 +10,15 @@ const REAL_PASSAGES = {
  'Daily routine': 'I wake up early, make a warm breakfast, and walk to work. In the evening, I cook dinner, call a friend, and read before bed.',
  Travel: 'Our train left the station just after sunrise. We watched the fields pass by, found a small hotel, and explored the old city on foot.'
 };
+const EXPANDED_TITLES = new Set(['Home and family','Nature','Daily numbers','Shopping','A short note','A reminder','Email addresses','Prices and discounts']);
+const expandPassage = (base,title) => {
+ if(!EXPANDED_TITLES.has(title)) return base;
+ const subjects=['A careful learner','The small team','Our friendly guide','Every new project','A curious student','The morning group','A patient reader','The local community'];
+ const actions=['planned the next step','checked the details','shared a useful idea','recorded the result','asked a thoughtful question','made a simple change','reviewed the instructions','celebrated steady progress'];
+ const places=['at home','in the classroom','near the station','beside the garden','during the afternoon','before the meeting','on the quiet street','after a short walk'];
+ const sentences=Array.from({length:80},(_,i)=>`${subjects[i%subjects.length]} ${actions[(i*3)%actions.length]} ${places[(i*5)%places.length]}, then wrote a clear note about what happened next.`);
+ return `${base} ${sentences.join(' ')}`;
+};
 const showError=e=>e?.message||'An unexpected error occurred';
 const seconds=(ms)=>Math.max(0,Math.floor(ms/1000));
 function stats(target,typed,elapsedMs){let good=0;for(let i=0;i<typed.length;i++)if(typed[i]===target[i])good++;return {accuracy:typed.length?Math.round(good/typed.length*100):100,wpm:elapsedMs>0?Math.round(good/5/(elapsedMs/60000)):0,good};}
@@ -18,14 +27,15 @@ function keySound(ok,key='a'){
  try{
   const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
   typingAudio=typingAudio||new C();if(typingAudio.state==='suspended')typingAudio.resume();
-  const t=typingAudio.currentTime,variation=(key.charCodeAt(0)%9)*7;
+  const t=typingAudio.currentTime,variation=(key.charCodeAt(0)%5)*3;
   const osc=typingAudio.createOscillator(),toneGain=typingAudio.createGain();
-  osc.type='square';osc.frequency.setValueAtTime((ok?155:105)+variation,t);
-  toneGain.gain.setValueAtTime(.0001,t);toneGain.gain.exponentialRampToValueAtTime(ok?.055:.08,t+.002);toneGain.gain.exponentialRampToValueAtTime(.0001,t+.075);
-  osc.connect(toneGain).connect(typingAudio.destination);osc.start(t);osc.stop(t+.08);
-  const buffer=typingAudio.createBuffer(1,Math.floor(typingAudio.sampleRate*.045),typingAudio.sampleRate),data=buffer.getChannelData(0);
+  osc.type='triangle';osc.frequency.setValueAtTime((ok?92:72)+variation,t);osc.frequency.exponentialRampToValueAtTime((ok?58:45)+variation,t+.055);
+  toneGain.gain.setValueAtTime(.0001,t);toneGain.gain.exponentialRampToValueAtTime(ok?.045:.06,t+.003);toneGain.gain.exponentialRampToValueAtTime(.0001,t+.065);
+  osc.connect(toneGain).connect(typingAudio.destination);osc.start(t);osc.stop(t+.07);
+  const buffer=typingAudio.createBuffer(1,Math.floor(typingAudio.sampleRate*.032),typingAudio.sampleRate),data=buffer.getChannelData(0);
   for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,2);
-  const click=typingAudio.createBufferSource(),clickGain=typingAudio.createGain();click.buffer=buffer;clickGain.gain.value=ok?.12:.16;click.connect(clickGain).connect(typingAudio.destination);click.start(t);
+  const filter=typingAudio.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1550;
+  const click=typingAudio.createBufferSource(),clickGain=typingAudio.createGain();click.buffer=buffer;clickGain.gain.value=ok?.055:.075;click.connect(filter).connect(clickGain).connect(typingAudio.destination);click.start(t);
  }catch(e){}
 }
 function TypingBox({text,onComplete,enabled=true,resetKey=0,showTimer=true,practice=false}){
@@ -69,7 +79,7 @@ export default function App(){
  const [guestMode,setGuestMode]=useState(()=>localStorage.getItem('typearena_guest')==='yes');
  const [guestResults,setGuestResults]=useState(()=>{try{return JSON.parse(localStorage.getItem('typearena_guest_results')||'[]')}catch{return []}});
  const chosenLesson=lesson===20?{title:'Custom text',text:customText.trim()}:LESSONS[lesson];
- const practiceText=useMemo(()=>lesson===20?chosenLesson.text:(REAL_PASSAGES[chosenLesson.title]||longPassage(chosenLesson.text)),[lesson,customText]);
+ const practiceText=useMemo(()=>lesson===20?chosenLesson.text:expandPassage(REAL_PASSAGES[chosenLesson.title]||longPassage(chosenLesson.text),chosenLesson.title),[lesson,customText]);
  const [races,setRaces]=useState([]),[race,setRace]=useState(null),[participants,setParticipants]=useState([]),[results,setResults]=useState([]);
  const [newTitle,setNewTitle]=useState('Class typing challenge'),[newText,setNewText]=useState('The best way to learn to type is to practice a little every day.'),[joinCode,setJoinCode]=useState('');
  const [clock,setClock]=useState(Date.now()),[submitting,setSubmitting]=useState(false);
