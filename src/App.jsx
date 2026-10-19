@@ -22,20 +22,22 @@ const expandPassage = (base,title) => {
 const showError=e=>e?.message||'An unexpected error occurred';
 const seconds=(ms)=>Math.max(0,Math.floor(ms/1000));
 function stats(target,typed,elapsedMs){let good=0;for(let i=0;i<typed.length;i++)if(typed[i]===target[i])good++;return {accuracy:typed.length?Math.round(good/typed.length*100):100,wpm:elapsedMs>0?Math.round(good/5/(elapsedMs/60000)):0,good};}
-let typingAudio=null;
-function keySound(ok,key='a'){
+let typingAudio=null,typingSamples=null;
+function makeKeySample(audio,ok){
+ const length=Math.floor(audio.sampleRate*.045),buffer=audio.createBuffer(1,length,audio.sampleRate),data=buffer.getChannelData(0);
+ for(let i=0;i<length;i++){
+  const time=i/audio.sampleRate,envelope=Math.exp(-time*105),thock=Math.sin(2*Math.PI*(ok?118:92)*time)*.55;
+  const softenedNoise=(Math.random()*2-1)*.18;
+  data[i]=(thock+softenedNoise)*envelope;
+ }
+ return buffer;
+}
+function keySound(ok){
  try{
   const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
   typingAudio=typingAudio||new C();if(typingAudio.state==='suspended')typingAudio.resume();
-  const t=typingAudio.currentTime,variation=(key.charCodeAt(0)%5)*3;
-  const osc=typingAudio.createOscillator(),toneGain=typingAudio.createGain();
-  osc.type='triangle';osc.frequency.setValueAtTime((ok?92:72)+variation,t);osc.frequency.exponentialRampToValueAtTime((ok?58:45)+variation,t+.055);
-  toneGain.gain.setValueAtTime(.0001,t);toneGain.gain.exponentialRampToValueAtTime(ok?.045:.06,t+.003);toneGain.gain.exponentialRampToValueAtTime(.0001,t+.065);
-  osc.connect(toneGain).connect(typingAudio.destination);osc.start(t);osc.stop(t+.07);
-  const buffer=typingAudio.createBuffer(1,Math.floor(typingAudio.sampleRate*.032),typingAudio.sampleRate),data=buffer.getChannelData(0);
-  for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,2);
-  const filter=typingAudio.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1550;
-  const click=typingAudio.createBufferSource(),clickGain=typingAudio.createGain();click.buffer=buffer;clickGain.gain.value=ok?.055:.075;click.connect(filter).connect(clickGain).connect(typingAudio.destination);click.start(t);
+  typingSamples=typingSamples||{ok:makeKeySample(typingAudio,true),wrong:makeKeySample(typingAudio,false)};
+  const source=typingAudio.createBufferSource(),gain=typingAudio.createGain();source.buffer=typingSamples[ok?'ok':'wrong'];gain.gain.value=ok?.075:.095;source.connect(gain).connect(typingAudio.destination);source.start();
  }catch(e){}
 }
 function TypingBox({text,onComplete,enabled=true,resetKey=0,showTimer=true,practice=false}){
