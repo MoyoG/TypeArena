@@ -1,6 +1,6 @@
 # TypeArena — GitHub classroom typing competition
 
-Students sign in with their GitHub accounts and join a teacher-created race with a six-character code. Each race supports up to 40 signed-in students, with live participant updates and a ranked WPM/accuracy result board.
+Students sign in with their GitHub accounts and join a teacher-created race with a six-character code. Races support signed-in students at classroom scale, with live participant updates and a ranked WPM/accuracy result board.
 
 A browser-based, mobile-friendly classroom typing tutor with GitHub OAuth, individual practice, teacher-only races, live result updates, server-controlled score submission, and one bonus point for each finalized race winner.
 
