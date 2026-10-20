@@ -124,10 +124,13 @@ begin
 end $$;
 create function public.join_race_by_id(p_race_id uuid) returns uuid
 language plpgsql security definer set search_path='' as $$
+declare v_count integer;
 begin
  if auth.uid() is null then raise exception 'Sign in required'; end if;
  if not exists(select 1 from public.races where id=p_race_id and status='waiting') then
  raise exception 'Race is not accepting participants'; end if;
+ select count(*) into v_count from public.race_participants where race_id=p_race_id;
+ if v_count >= 40 then raise exception 'This classroom race is full (40 students maximum)'; end if;
  insert into public.race_participants(race_id,user_id) values(p_race_id,auth.uid()) on conflict do nothing;
  return p_race_id;
 end $$;
