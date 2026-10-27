@@ -174,7 +174,7 @@ begin
  then raise exception 'Race submission outside time window'; end if;
  if exists(select 1 from public.race_results where race_id=p_race_id and user_id=auth.uid())
  then raise exception 'Result already submitted'; end if;
- if p_typed is distinct from v_race.passage then raise exception 'Finish the passage accurately'; end if;
+ if p_typed is null or length(p_typed)>length(v_race.passage) then raise exception 'Invalid typed passage'; end if;
  v_server_elapsed:=greatest(1,(extract(epoch from(now()-v_race.started_at))*1000)::integer);
  if p_elapsed_ms is null or p_elapsed_ms<1000 or p_elapsed_ms>v_race.duration_seconds*1000+10000
  or p_elapsed_ms>v_server_elapsed+1500 then raise exception 'Invalid typing time'; end if;

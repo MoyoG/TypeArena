@@ -26,15 +26,16 @@ let typingAudio=null;
 function keySound(ok){
  try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;typingAudio=typingAudio||new C();if(typingAudio.state==='suspended')typingAudio.resume();const osc=typingAudio.createOscillator(),gain=typingAudio.createGain(),t=typingAudio.currentTime;osc.type=ok?'sine':'triangle';osc.frequency.setValueAtTime(ok?740:230,t);gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(ok?.045:.075,t+.008);gain.gain.exponentialRampToValueAtTime(.0001,t+(ok?.055:.14));osc.connect(gain).connect(typingAudio.destination);osc.start(t);osc.stop(t+(ok?.06:.15));}catch(e){}
 }
-function TypingBox({text,onComplete,enabled=true,resetKey=0,showTimer=true,practice=false}){
- const [typed,setTyped]=useState(''),[started,setStarted]=useState(null),[now,setNow]=useState(Date.now()),[muted,setMuted]=useState(false),[duration,setDuration]=useState(180),[done,setDone]=useState(null);
+function TypingBox({text,onComplete,enabled=true,resetKey=0,showTimer=true,practice=false,autoFinishWhenDisabled=false}){
+ const [typed,setTyped]=useState(''),[started,setStarted]=useState(null),[now,setNow]=useState(Date.now()),[muted,setMuted]=useState(false),[duration,setDuration]=useState(60),[done,setDone]=useState(null);
  const finished=useRef(false),ref=useRef(null),cursor=useRef(null),passage=useRef(null);
  useEffect(()=>{setTyped('');setStarted(null);setDone(null);finished.current=false;},[text,resetKey,duration]);
  const elapsed=started?Math.max(0,now-started):0;
  const remaining=Math.max(0,duration-Math.floor(elapsed/1000));
  const s=stats(text,typed,Math.max(1,elapsed));
  const finish=useCallback((value,ms)=>{if(finished.current)return;finished.current=true;const result={typed:value,elapsedMs:Math.max(1,ms),...stats(text,value,Math.max(1,ms))};setDone(result);onComplete?.(result);},[text,onComplete]);
- useEffect(()=>{if(!started||finished.current||!enabled)return;const t=setInterval(()=>{const stamp=Date.now();setNow(stamp);if(practice&&stamp-started>=duration*1000)finish(typed,duration*1000)},120);return()=>clearInterval(t)},[started,typed,enabled,practice,duration,finish]);
+ useEffect(()=>{if(!started||finished.current||!enabled)return;const t=setInterval(()=>{const stamp=Date.now();setNow(stamp);if(stamp-started>=duration*1000)finish(typed,duration*1000)},120);return()=>clearInterval(t)},[started,typed,enabled,duration,finish]);
+ useEffect(()=>{if(autoFinishWhenDisabled&&started&&!enabled&&!finished.current)finish(typed,Math.max(1,Date.now()-started))},[autoFinishWhenDisabled,enabled,started,typed,finish]);
  useEffect(()=>{
   const c=cursor.current,p=passage.current;
   if(!c||!p)return;
@@ -79,6 +80,7 @@ export default function App(){
  useEffect(()=>{if(!supabase)return;supabase.auth.getSession().then(({data})=>setSession(data.session));const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,s)=>setSession(s));return()=>subscription.unsubscribe()},[]);
  useEffect(()=>{if(session)refresh();else{setProfile(null);setRace(null)}},[session,refresh]);
  useEffect(()=>{const t=setInterval(()=>setClock(Date.now()),500);return()=>clearInterval(t)},[]);
+ useEffect(()=>{document.getElementById('passage')?.setAttribute('maxLength','2000')},[page]);
  useEffect(()=>{if(!supabase||!session)return;const ch=supabase.channel('global-updates').on('postgres_changes',{event:'*',schema:'public',table:'races'},()=>refresh()).on('postgres_changes',{event:'*',schema:'public',table:'race_results'},()=>refresh()).subscribe();return()=>{supabase.removeChannel(ch)}},[session,refresh]);
  useEffect(()=>{if(!supabase||!raceId)return;refreshRace();const ch=supabase.channel('race-'+raceId).on('postgres_changes',{event:'*',schema:'public',table:'races',filter:`id=eq.${raceId}`},refreshRace).on('postgres_changes',{event:'*',schema:'public',table:'race_participants',filter:`race_id=eq.${raceId}`},refreshRace).on('postgres_changes',{event:'*',schema:'public',table:'race_results',filter:`race_id=eq.${raceId}`},refreshRace).subscribe();const t=setInterval(refreshRace,4000);return()=>{clearInterval(t);supabase.removeChannel(ch)}},[raceId,refreshRace]);
  async function login(){if(!supabase){setError('GitHub login is not configured yet. You can continue as a guest.');return;}setError('');const redirectTo='https://moyog.github.io/TypeArena/';const {error}=await supabase.auth.signInWithOAuth({provider:'github',options:{redirectTo}});if(error)setError(showError(error))}
@@ -93,7 +95,7 @@ export default function App(){
  const isJoined=participants.some(p=>p.user_id===session?.user.id);
  const alreadySubmitted=results.some(r=>r.user_id===session?.user.id);
  const raceStart=race?.started_at?new Date(race.started_at).getTime():0;
- const raceEnd=raceStart+(race?.duration_seconds||90)*1000;
+ const raceEnd=raceStart+(race?.duration_seconds||60)*1000;
  const running=race?.status==='running'&&clock>=raceStart&&clock<raceEnd;
  const timeLeft=running?Math.ceil((raceEnd-clock)/1000):0;
  const sortedResults=useMemo(()=>[...results].sort((a,b)=>b.wpm-a.wpm||b.accuracy-a.accuracy||a.elapsed_ms-b.elapsed_ms),[results]);
